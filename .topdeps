@@ -1,1 +1,2 @@
 t/selftests-mptcp-set-and-print-the-fullmesh-flag
+t/mptcp-shrink-mptcp_out_options-struct
