@@ -1770,9 +1770,8 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 {
 	subflow_ops->obj_size = sizeof(struct mptcp_subflow_request_sock);
-	subflow_ops->slab_name = "request_sock_subflow";
 
-	subflow_ops->slab = kmem_cache_create(subflow_ops->slab_name,
+	subflow_ops->slab = kmem_cache_create("request_sock_subflow",
 					      subflow_ops->obj_size, 0,
 					      SLAB_ACCOUNT |
 					      SLAB_TYPESAFE_BY_RCU,
