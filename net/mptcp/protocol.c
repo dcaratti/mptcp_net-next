@@ -1801,10 +1801,31 @@ out:
 	return copied ? : ret;
 }
 
+static bool __mptcp_move_skbs(struct mptcp_sock *msk);
+
+static void mptcp_update_ready_flag(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (skb_queue_empty_lockless(&sk->sk_receive_queue) &&
+	    skb_queue_empty(&msk->receive_queue)) {
+		/* entire backlog drained, clear DATA_READY. */
+		clear_bit(MPTCP_DATA_READY, &msk->flags);
+
+		/* .. race-breaker: ssk might have gotten new data
+		 * after last __mptcp_move_skbs() returned false.
+		 */
+		if (unlikely(__mptcp_move_skbs(msk)))
+			set_bit(MPTCP_DATA_READY, &msk->flags);
+	}
+}
+
 static void mptcp_wait_data(struct sock *sk, long *timeo)
 {
 	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	mptcp_update_ready_flag(sk);
 
 	add_wait_queue(sk_sleep(sk), &wait);
 	sk_set_bit(SOCKWQ_ASYNC_WAITDATA, sk);
@@ -2122,17 +2143,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		mptcp_wait_data(sk, &timeo);
 	}
 
-	if (skb_queue_empty_lockless(&sk->sk_receive_queue) &&
-	    skb_queue_empty(&msk->receive_queue)) {
-		/* entire backlog drained, clear DATA_READY. */
-		clear_bit(MPTCP_DATA_READY, &msk->flags);
-
-		/* .. race-breaker: ssk might have gotten new data
-		 * after last __mptcp_move_skbs() returned false.
-		 */
-		if (unlikely(__mptcp_move_skbs(msk)))
-			set_bit(MPTCP_DATA_READY, &msk->flags);
-	}
+	mptcp_update_ready_flag(sk);
 
 out_err:
 	if (cmsg_flags && copied >= 0) {
